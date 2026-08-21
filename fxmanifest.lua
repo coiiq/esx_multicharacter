@@ -8,10 +8,7 @@ lua54 'yes'
 
 dependencies {
     'es_extended',
-    'oxmysql',
-    'esx_identity',
-    'skinchanger',
-    'esx_skin'
+    'oxmysql'
 }
 
 shared_scripts {
