@@ -43,6 +43,13 @@ local function notify(playerId, message)
     TriggerClientEvent('coii_multicharacter:notify', playerId, message)
 end
 
+local function getConfiguredSlotCounts()
+    local paid = type(Config.PaidSlots) == 'table' and Config.PaidSlots or {}
+    local freeSlots = math.max(1, math.min(255, math.floor(tonumber(paid.FreeSlots) or 1)))
+    local totalSlots = math.max(freeSlots, math.min(255, math.floor(tonumber(paid.TotalSlots) or freeSlots)))
+    return freeSlots, totalSlots
+end
+
 local function ensureDatabase()
     local ownershipTable = MySQL.query.await("SHOW TABLES LIKE 'coii_multicharacter_slots'")
     MySQL.query.await([[
@@ -67,14 +74,15 @@ local function ensureDatabase()
     if not ownershipTable or not ownershipTable[1] then
         local legacyTable = MySQL.query.await("SHOW TABLES LIKE 'multicharacter_slots'")
         if legacyTable and legacyTable[1] then
-            local maximumPaid = math.max(0, Config.PaidSlots.TotalSlots - Config.PaidSlots.FreeSlots)
+            local freeSlots, totalSlots = getConfiguredSlotCounts()
+            local maximumPaid = math.max(0, totalSlots - freeSlots)
             MySQL.update.await([[
                 INSERT INTO `coii_multicharacter_slots` (`identifier`, `purchased_slots`)
                 SELECT `identifier`, LEAST(?, GREATEST(`slots` - ?, 0))
                 FROM `multicharacter_slots`
                 WHERE `slots` > ?
                 ON DUPLICATE KEY UPDATE `purchased_slots` = GREATEST(`purchased_slots`, VALUES(`purchased_slots`))
-            ]], { maximumPaid, Config.PaidSlots.FreeSlots, Config.PaidSlots.FreeSlots })
+            ]], { maximumPaid, freeSlots, freeSlots })
             log('Migrated stock ESX slot overrides')
         end
     end
@@ -121,7 +129,8 @@ local function getPurchasedSlots(identifier)
 end
 
 local function setPurchasedSlots(identifier, amount)
-    local maximum = math.max(0, Config.PaidSlots.TotalSlots - Config.PaidSlots.FreeSlots)
+    local freeSlots, totalSlots = getConfiguredSlotCounts()
+    local maximum = math.max(0, totalSlots - freeSlots)
     amount = math.max(0, math.min(maximum, math.floor(tonumber(amount) or 0)))
     MySQL.update.await([[
         INSERT INTO `coii_multicharacter_slots` (`identifier`, `purchased_slots`)
@@ -265,14 +274,15 @@ end
 
 local function getSlotState(identifier, highestExistingSlot)
     local paid = Config.PaidSlots
+    local freeSlots, totalSlots = getConfiguredSlotCounts()
     if not paid.Enabled then
         return {
             enabled = false,
             canDelete = Config.CanDelete == true,
-            freeSlots = paid.TotalSlots,
-            totalSlots = paid.TotalSlots,
+            freeSlots = totalSlots,
+            totalSlots = totalSlots,
             purchasedSlots = 0,
-            unlockedSlots = paid.TotalSlots,
+            unlockedSlots = totalSlots,
             priceLabel = paid.PriceLabel,
             storeEnabled = paid.StoreEnabled == true,
             storeUrl = isValidStoreUrl(paid.StoreUrl) and paid.StoreUrl or ''
@@ -281,7 +291,7 @@ local function getSlotState(identifier, highestExistingSlot)
 
     local purchased = getPurchasedSlots(identifier)
     if paid.GrandfatherExistingCharacters then
-        local requiredPurchased = math.max(0, highestExistingSlot - paid.FreeSlots)
+        local requiredPurchased = math.max(0, highestExistingSlot - freeSlots)
         if requiredPurchased > purchased then
             purchased = setPurchasedSlots(identifier, requiredPurchased)
             log(('Grandfathered %s with %s purchased slot(s)'):format(identifier, purchased))
@@ -291,10 +301,10 @@ local function getSlotState(identifier, highestExistingSlot)
     return {
         enabled = true,
         canDelete = Config.CanDelete == true,
-        freeSlots = paid.FreeSlots,
-        totalSlots = paid.TotalSlots,
+        freeSlots = freeSlots,
+        totalSlots = totalSlots,
         purchasedSlots = purchased,
-        unlockedSlots = math.min(paid.TotalSlots, paid.FreeSlots + purchased),
+        unlockedSlots = math.min(totalSlots, freeSlots + purchased),
         priceLabel = paid.PriceLabel,
         storeEnabled = paid.StoreEnabled == true,
         storeUrl = isValidStoreUrl(paid.StoreUrl) and paid.StoreUrl or ''
@@ -381,8 +391,9 @@ end)
 RegisterNetEvent('coii_multicharacter:chooseCharacter', function(slot, isNew)
     local playerId = source
     slot = tonumber(slot)
+    local _, totalSlots = getConfiguredSlotCounts()
     if not slot or slot % 1 ~= 0 or type(isNew) ~= 'boolean' then return end
-    if slot < 1 or slot > Config.PaidSlots.TotalSlots then return end
+    if slot < 1 or slot > totalSlots then return end
 
     local identifier = getIdentifier(playerId)
     local session = selectionSessions[playerId]
@@ -500,11 +511,12 @@ end
 RegisterNetEvent('coii_multicharacter:deleteCharacter', function(slot)
     local playerId = source
     slot = tonumber(slot)
+    local _, totalSlots = getConfiguredSlotCounts()
 
     if not Config.CanDelete then
         return sendDeleteStatus(playerId, false, 'deletion_disabled')
     end
-    if not slot or slot % 1 ~= 0 or slot < 1 or slot > Config.PaidSlots.TotalSlots then
+    if not slot or slot % 1 ~= 0 or slot < 1 or slot > totalSlots then
         return sendDeleteStatus(playerId, false, 'invalid_character_slot')
     end
 
@@ -588,11 +600,12 @@ RegisterNetEvent('coii_multicharacter:requestPurchase', function(slot)
     local playerId = source
     if isRateLimited(playerId, 'purchase', 1000) then return end
     slot = tonumber(slot)
+    local _, totalSlots = getConfiguredSlotCounts()
     if not Config.PaidSlots.Enabled
         or not slot
         or slot % 1 ~= 0
         or slot < 1
-        or slot > Config.PaidSlots.TotalSlots then return end
+        or slot > totalSlots then return end
 
     local identifier = getIdentifier(playerId)
     local session = selectionSessions[playerId]

@@ -475,7 +475,6 @@ function normalizeTrackIndex(value) {
 
 function buildCharacterSlots(rawCharacters, options = {}) {
     const suppliedCharacters = Array.isArray(rawCharacters) ? rawCharacters : [];
-    if (!options.enabled) return suppliedCharacters;
 
     const highestSuppliedSlot = suppliedCharacters.reduce((highest, character) => Math.max(highest, Number(character.slot) || 0), 0);
     const totalSlots = Math.max(Number(options.totalSlots) || suppliedCharacters.length, suppliedCharacters.length, highestSuppliedSlot);
