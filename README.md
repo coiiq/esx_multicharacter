@@ -89,6 +89,8 @@ Opening the URL does **not** automatically unlock a slot. An administrator, anot
 
 `GrandfatherExistingCharacters` automatically preserves access for players who already have characters above the configured free-slot limit.
 
+When `Enabled = false`, paid-slot locking is disabled and every configured slot is available for character creation. Set `FreeSlots` to the desired slot count; the resource automatically raises the effective total when `TotalSlots` is lower.
+
 ### Interface defaults
 
 `Config.PreferenceDefaults` controls the initial locale, theme, RGB colors, music track, volume, and interface scale. After a player changes these values, their personal settings take priority and are saved in `coii_multicharacter_preferences`.
@@ -144,7 +146,7 @@ Config.Music = {
 }
 ```
 
-Only `.mp3` files configured in the track list are loaded. `MusicTrack = 0` disables music; positive values select a configured track. Confirm that you have permission to redistribute every included audio file before publishing the resource.
+Only `.mp3` files configured in the track list are loaded. `MusicTrack = 0` disables music; positive values select a configured track.
 
 Bundled music:
 
