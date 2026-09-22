@@ -839,13 +839,18 @@ RegisterNetEvent('esx:playerLoaded', function(playerData, isNew, skin)
         TriggerEvent('skinchanger:loadSkin', skin)
     end
 
-    local spawn = playerData.coords
+    local esxConfig = ESX.GetConfig()
+    local spawns = esxConfig and esxConfig.DefaultSpawns or {}
+
+    local spawn = not isNew and playerData.coords or nil
+
+    if not spawn and #spawns > 0 then
+        spawn = spawns[math.random(1, #spawns)]
+    end
+
     if not spawn then
-        local esxConfig = ESX.GetConfig()
-        local spawns = esxConfig and esxConfig.DefaultSpawns or {}
-        spawn = #spawns > 0
-            and spawns[math.random(1, #spawns)]
-            or vector4(-269.4, -955.3, 31.2, 205.0)
+        ESX.ShowNotification('No default spawn has been configured.')
+        return
     end
 
     destroyCamera()
